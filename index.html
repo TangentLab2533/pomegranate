@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>石榴树试卷书库</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-wrap {
+            flex: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        /* 搜索框样式 */
+        .search-box {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto 30px;
+            position: relative;
+        }
+
+        #searchInput {
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 16px;
+            border: 2px solid #3498db;
+            border-radius: 30px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        #searchInput:focus {
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+        }
+
+        /* 书籍列表样式 */
+        .book-list {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .book-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 16px;
+        }
+
+        .book-item:last-child {
+            border-bottom: none;
+        }
+
+        .book-item a {
+            color: #2c3e50;
+            text-decoration: none;
+            display: block;
+            transition: color 0.2s;
+        }
+
+        .book-item a:hover {
+            color: #3498db;
+            font-weight: bold;
+        }
+
+        /* 分页样式 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        .page-btn {
+            padding: 8px 15px;
+            border: 1px solid #3498db;
+            background: white;
+            color: #3498db;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .page-btn.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .page-btn:hover:not(.active) {
+            background: #e8f4fd;
+        }
+
+        /* 空数据提示 */
+        .empty-tip {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-size: 18px;
+        }
+
+        /* 底部版权 */
+        .footer {
+            text-align: center;
+            padding: 30px 0 20px;
+            color: #666;
+            font-size: 14px;
+            margin-top: 40px;
+            border-top: 1px solid #eee;
+        }
+        .footer a {
+            color: #3498db;
+            text-decoration: none;
+            margin: 0 6px;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-wrap">
+        <div class="header">
+            <h1>📚 石榴树书库</h1>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 输入书籍名称搜索...">
+            </div>
+        </div>
+
+        <!-- 书籍列表容器 -->
+        <div id="bookList" class="book-list"></div>
+
+        <!-- 分页容器 -->
+        <div id="pagination" class="pagination"></div>
+    </div>
+
+    <!-- 底部版权声明 -->
+    <div class="footer">
+        © 版权所有 
+        <a href="https://www.tangentlab.cn" target="_blank">TangentLab</a>
+        |
+        <a href="https://www.qqxxzz.com" target="_blank">全球学校组织</a>
+    </div>
+
+    <script>
+        // 配置项
+        const PAGE_SIZE = 10; // 每页10本书
+        let allBooks = [];    // 所有书籍数据
+        let filteredBooks = []; // 搜索过滤后的书籍
+        let currentPage = 1;  // 当前页码
+
+        // 页面加载完成后初始化
+        window.onload = function () {
+            loadBookList();
+            // 绑定搜索事件
+            document.getElementById('searchInput').addEventListener('input', searchBooks);
+        };
+
+        // 读取list.txt文件并解析书籍数据
+        async function loadBookList() {
+            try {
+                // 读取工作目录下的list.txt
+                const response = await fetch('list.txt');
+                const text = await response.text();
+                
+                // 按行解析文本
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                
+                // 解析每一行：格式 "显示名称 文件名.pdf"
+                allBooks = lines.map(line => {
+                    // 匹配最后一个空格分割名称和路径（支持名称中带空格）
+                    const lastSpaceIndex = line.lastIndexOf(' ');
+                    const name = line.substring(0, lastSpaceIndex).trim();
+                    const path = line.substring(lastSpaceIndex + 1).trim();
+                    return { name, path };
+                });
+
+                // 初始化过滤数据
+                filteredBooks = [...allBooks];
+                // 渲染第一页
+                renderPage();
+            } catch (error) {
+                document.getElementById('bookList').innerHTML = 
+                    '<div class="empty-tip">❌ 读取书籍列表失败，请检查list.txt文件是否存在</div>';
+                console.error('读取list.txt失败：', error);
+            }
+        }
+
+        // 搜索功能
+        function searchBooks() {
+            const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+            // 根据书名过滤（不区分大小写）
+            filteredBooks = allBooks.filter(book => 
+                book.name.toLowerCase().includes(keyword)
+            );
+            // 重置为第一页
+            currentPage = 1;
+            renderPage();
+        }
+
+        // 渲染当前页书籍和分页
+        function renderPage() {
+            renderBooks();
+            renderPagination();
+        }
+
+        // 渲染书籍列表
+        function renderBooks() {
+            const bookListEl = document.getElementById('bookList');
+            const total = filteredBooks.length;
+
+            // 无数据提示
+            if (total === 0) {
+                bookListEl.innerHTML = '<div class="empty-tip">🔍 未找到匹配的书籍，您可以前往格罗布书库查找：lib.qqxxzz.com</div>';
+                return;
+            }
+
+            // 计算分页起始/结束索引
+            const start = (currentPage - 1) * PAGE_SIZE;
+            const end = start + PAGE_SIZE;
+            const currentBooks = filteredBooks.slice(start, end);
+
+            // 拼接HTML
+            let html = '';
+            currentBooks.forEach(book => {
+                html += `
+                    <div class="book-item">
+                        <a href="${book.path}" target="_blank">📖 ${book.name}</a>
+                    </div>
+                `;
+            });
+            bookListEl.innerHTML = html;
+        }
+
+        // 渲染分页按钮
+        function renderPagination() {
+            const paginationEl = document.getElementById('pagination');
+            const totalPages = Math.ceil(filteredBooks.length / PAGE_SIZE);
+
+            // 总页数≤1时隐藏分页
+            if (totalPages <= 1) {
+                paginationEl.innerHTML = '';
+                return;
+            }
+
+            // 生成分页按钮
+            let html = '';
+            for (let i = 1; i <= totalPages; i++) {
+                html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+            }
+            paginationEl.innerHTML = html;
+        }
+
+        // 切换页码
+        function changePage(page) {
+            currentPage = page;
+            renderPage();
+        }
+    </script>
+</body>
+</html>
